@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bagikan Lokasi</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:#101820;
+font-family:Arial,sans-serif;color:#fff;padding:20px}
+.card{width:min(430px,100%);background:#182632;padding:25px;border-radius:18px;text-align:center}
+h1{margin:0 0 10px}
+p{color:#b9c6d0;line-height:1.5}
+button{width:100%;padding:15px;border:0;border-radius:12px;background:#168f63;color:white;
+font-size:16px;font-weight:bold;cursor:pointer;margin-top:8px}
+button.secondary{background:#405363}
+button:disabled{opacity:.6}
+#status{margin-top:18px;min-height:24px;line-height:1.5}
+.help{display:none;text-align:left;background:#243642;border-radius:12px;padding:14px;margin-top:15px}
+.help.show{display:block}
+.help ol{padding-left:20px;margin-bottom:0}
+.small{font-size:13px;color:#8fa2b0}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>Bagikan Lokasi Saya</h1>
+<p id="description">
+Tekan tombol di bawah, lalu pilih <b>Izinkan</b> ketika browser meminta akses lokasi.
+</p>
+
+<button id="btn">Bagikan Lokasi Saya</button>
+<button id="retry" class="secondary" style="display:none">Coba Lagi / Aktifkan Izin</button>
+
+<div id="status" role="status" aria-live="polite"></div>
+
+<div id="help" class="help">
+<b>Cara mengaktifkan izin lokasi:</b>
+<ol>
+<li>Pastikan <b>Lokasi/GPS</b> perangkat aktif.</li>
+<li>Tekan ikon <b>gembok/izin</b> di sebelah alamat situs.</li>
+<li>Pilih <b>Lokasi → Izinkan</b>.</li>
+<li>Kembali ke halaman ini lalu tekan <b>Coba Lagi</b>.</li>
+</ol>
+<p class="small">Jika halaman dibuka sebagai file HTML langsung, gunakan HTTPS atau localhost agar lokasi browser dapat digunakan.</p>
+</div>
+</div>
+
+<script>
+const EMAIL = "alrahmanalrahman90@gmail.com";
+const FORM_ENDPOINT = "https://formsubmit.co/" + encodeURIComponent(EMAIL);
+
+const btn = document.getElementById("btn");
+const retry = document.getElementById("retry");
+const status = document.getElementById("status");
+const help = document.getElementById("help");
+
+function show(text){
+  status.textContent = text;
+}
+
+function locationError(err){
+  btn.disabled = false;
+  retry.style.display = "block";
+  help.classList.add("show");
+
+  if(err.code === 1){
+    show("Akses lokasi ditolak. Aktifkan izin Lokasi untuk situs ini, lalu tekan Coba Lagi.");
+  }else if(err.code === 2){
+    show("Lokasi tidak tersedia. Aktifkan GPS/Lokasi perangkat dan pastikan Anda memiliki sinyal yang cukup.");
+  }else if(err.code === 3){
+    show("Waktu pencarian lokasi habis. Pastikan GPS aktif, lalu tekan Coba Lagi.");
+  }else{
+    show("Lokasi tidak dapat diperoleh. Periksa pengaturan lokasi perangkat lalu coba lagi.");
+  }
+}
+
+function getLocation(){
+  if(!window.isSecureContext && location.protocol !== "file:"){
+    show("Halaman ini tidak menggunakan koneksi aman (HTTPS). Buka melalui HTTPS atau localhost.");
+    retry.style.display = "block";
+    help.classList.add("show");
+    return;
+  }
+
+  if(!navigator.geolocation){
+    show("Browser ini tidak mendukung fitur lokasi.");
+    return;
+  }
+
+  btn.disabled = true;
+  retry.style.display = "none";
+  help.classList.remove("show");
+  show("Meminta izin lokasi...");
+
+  navigator.geolocation.getCurrentPosition(async (pos)=>{
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+    const accuracy = Math.round(pos.coords.accuracy);
+    const time = new Date(pos.timestamp).toLocaleString("id-ID");
+    const map = "https://www.google.com/maps?q=" +
+      encodeURIComponent(lat + "," + lon);
+
+    const data = new FormData();
+    data.append("_subject","Lokasi baru dibagikan");
+    data.append("_captcha","false");
+    data.append("_template","table");
+    data.append("latitude",lat);
+    data.append("longitude",lon);
+    data.append("akurasi",accuracy+" meter");
+    data.append("waktu",time);
+    data.append("Google Maps",map);
+
+    show("Lokasi berhasil didapat. Mengirim email...");
+
+    try{
+      const response = await fetch(FORM_ENDPOINT,{
+        method:"POST",
+        body:data,
+        headers:{"Accept":"application/json"}
+      });
+
+      if(!response.ok) throw new Error("send failed");
+
+      show("Lokasi berhasil dikirim.");
+      btn.disabled = false;
+    }catch(e){
+      show("Lokasi berhasil didapat, tetapi email gagal dikirim. Periksa koneksi internet lalu coba lagi.");
+      btn.disabled = false;
+      retry.style.display = "block";
+    }
+  },locationError,{
+    enableHighAccuracy:true,
+    timeout:20000,
+    maximumAge:0
+  });
+}
+
+btn.addEventListener("click",getLocation);
+retry.addEventListener("click",getLocation);
+</script>
+</body>
+</html>
